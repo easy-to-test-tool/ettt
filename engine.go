@@ -2,6 +2,7 @@ package ettt
 
 import (
 	"github.com/google/uuid"
+	"log"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -25,10 +26,13 @@ func New(scenarios []Scenario,
 	extensions []ExtensionContext,
 	options Options) (Engine, error) {
 
+	log.SetPrefix("[ettt] ")
+	log.SetFlags(log.Lmsgprefix | log.Ldate | log.Ltime | log.Lmicroseconds)
+
 	// Profileの解析＆変数保持
 	profile, err := ParseProfile(resolveProfile(options))
 	if err != nil {
-		slog.Error("ettt: profile parse error occurred...", err)
+		slog.Error("profile parse error occurred...", err)
 		return Engine{}, err
 	}
 
@@ -76,22 +80,22 @@ func (engine *Engine) Run() error {
 	// 結果ルートディレクトリ・結果ディレクトリの作成
 	resultRootDir, err := engine.createResultRootDir()
 	if err != nil {
-		slog.Error("ettt: failure create result root dir.")
+		slog.Error("failure create result root dir.")
 		return err
 	}
 	executionResultDir, err := engine.createDir(resultRootDir, engine.start.Format("20060102_150405"))
 	if err != nil {
-		slog.Error("ettt: failure create result dir.")
+		slog.Error("failure create result dir.")
 		return err
 	}
 
 	// 指定されたシナリオを随時実行
 	// IDEA: 並列化対応するのであれば、このあたりから変更
 	for i, v := range engine.scenarios {
-		slog.Info("ettt: start scenario.", "index", i, "name", v.ScenarioContext.scenarioName)
+		slog.Info("start scenario.", "index", i, "name", v.ScenarioContext.scenarioName)
 		v.executionResultDir = executionResultDir
 		engine.runScenario(v)
-		slog.Info("ettt: end scenario.",
+		slog.Info("end scenario.",
 			"index", i,
 			"name", v.ScenarioContext.scenarioName,
 			"status", v.scenarioResultStatus)
@@ -112,7 +116,7 @@ func (engine *Engine) createResultRootDir() (string, error) {
 	if filepath.IsAbs(engine.options.ResultPath) {
 		path, err := filepath.Abs("./")
 		if err != nil {
-			slog.Error("ettt: failure absolute file path.")
+			slog.Error("failure absolute file path.")
 			return "", err
 		}
 		dirPath = path + engine.options.ResultPath
@@ -122,7 +126,7 @@ func (engine *Engine) createResultRootDir() (string, error) {
 		// 存在しないため、新規作成を行う
 		var fileInfo, err = os.Lstat("./")
 		if err != nil {
-			slog.Error("ettt: failure get file info.")
+			slog.Error("failure get file info.")
 			return "", err
 		}
 		fileMode := fileInfo.Mode()
@@ -130,11 +134,11 @@ func (engine *Engine) createResultRootDir() (string, error) {
 
 		err = os.Mkdir(dirPath, unixPerms)
 		if err != nil {
-			slog.Error("ettt: failure get file info.")
+			slog.Error("failure get file info.")
 			return "", err
 		}
 	} else {
-		slog.Info("ettt: already exists result dir.", "resultDir", dirPath)
+		slog.Info("already exists result dir.", "resultDir", dirPath)
 	}
 	return dirPath, nil
 }
@@ -149,7 +153,7 @@ func (engine *Engine) createDir(parent string, target string) (string, error) {
 		// 存在しないため、新規作成を行う
 		var fileInfo, err = os.Lstat("./")
 		if err != nil {
-			slog.Error("ettt: failure get file info.")
+			slog.Error("failure get file info.")
 			return "", err
 		}
 		fileMode := fileInfo.Mode()
@@ -157,7 +161,7 @@ func (engine *Engine) createDir(parent string, target string) (string, error) {
 
 		err = os.Mkdir(targetPath, unixPerms)
 		if err != nil {
-			slog.Error("ettt: failure get file info.")
+			slog.Error("failure get file info.")
 			return "", err
 		}
 	}
@@ -176,64 +180,82 @@ func (engine *Engine) runScenario(es ExecuteScenario) {
 	es.start = time.Now()
 
 	// シナリオの結果ディレクトリ作成
-	scenarioResultDir, err := engine.createDir(es.executionResultDir, es.id.String())
+	scenarioResultDir, err := engine.createDir(es.executionResultDir, es.scenarioName+"_"+es.id.String())
 	if err != nil {
-		slog.Error("ettt: failure create result dir.")
+		slog.Error("failure create result dir.")
 		es.end = time.Now()
 		es.error = err
 		es.scenarioResultStatus = ScenarioFailure
 		return
 	}
 	es.scenarioResultDir = scenarioResultDir
+	detailsDir, err := engine.createDir(es.scenarioResultDir, "details")
+	if err != nil {
+		slog.Error("failure create details dir.")
+		es.end = time.Now()
+		es.error = err
+		es.scenarioResultStatus = ScenarioFailure
+		return
+	}
+	es.detailsDir = detailsDir
+	evidencesDir, err := engine.createDir(es.scenarioResultDir, "evidences")
+	if err != nil {
+		slog.Error("failure create evidences dir.")
+		es.end = time.Now()
+		es.error = err
+		es.scenarioResultStatus = ScenarioFailure
+		return
+	}
+	es.evidencesDir = evidencesDir
 
 	// Execute Scenario
-	slog.Info("ettt: start Setup.")
+	slog.Info("start Setup.")
 	es.ScenarioContext.phase = ScenarioPhaseSetup
 	err = scenario.Setup(engine.GlobalContext, es.ScenarioContext)
 	if err != nil {
-		slog.Info("ettt: error Setup.")
+		slog.Info("error Setup.")
 		es.end = time.Now()
 		es.scenarioResultStatus = ScenarioFailure
 		es.error = err
 		return
 	}
-	slog.Info("ettt: end Setup.")
+	slog.Info("end Setup.")
 
-	slog.Info("ettt: start Exercise.")
+	slog.Info("start Exercise.")
 	es.ScenarioContext.phase = ScenarioPhaseExercise
 	err = scenario.Exercise(engine.GlobalContext, es.ScenarioContext)
 	if err != nil {
-		slog.Warn("ettt: error Exercise.")
+		slog.Warn("error Exercise.")
 		es.end = time.Now()
 		es.scenarioResultStatus = ScenarioFailure
 		es.error = err
 		return
 	}
-	slog.Info("ettt: end Exercise.")
+	slog.Info("end Exercise.")
 
-	slog.Info("ettt: start Verify.")
+	slog.Info("start Verify.")
 	es.ScenarioContext.phase = ScenarioPhaseVerify
 	err = scenario.Verify(engine.GlobalContext, es.ScenarioContext)
 	if err != nil {
-		slog.Warn("ettt: error Verify.")
+		slog.Warn("error Verify.")
 		es.end = time.Now()
 		es.scenarioResultStatus = ScenarioFailure
 		es.error = err
 		return
 	}
-	slog.Info("ettt: end Verify.")
+	slog.Info("end Verify.")
 
-	slog.Info("ettt: start TearDown.")
+	slog.Info("start TearDown.")
 	es.ScenarioContext.phase = ScenarioPhaseTearDown
 	err = scenario.TearDown(engine.GlobalContext, es.ScenarioContext)
 	if err != nil {
-		slog.Info("ettt: error TearDown.")
+		slog.Info("error TearDown.")
 		es.end = time.Now()
 		es.scenarioResultStatus = ScenarioFailure
 		es.error = err
 		return
 	}
-	slog.Info("ettt: end TearDown.")
+	slog.Info("end TearDown.")
 
 	es.scenarioResultStatus = JudgeScenarioResult(*es.ScenarioContext)
 	es.end = time.Now()
@@ -249,15 +271,15 @@ func resolveProfile(options Options) string {
 	profile := ProfileDefault
 	profilePath := ProfilePathDefault
 	if "" != options.Profile {
-		slog.Debug("ettt: use designation　profile", "profile", profile)
+		slog.Debug("use designation　profile", "profile", profile)
 		profile = options.Profile
 	}
 	if "" != options.ProfilePath {
-		slog.Debug("ettt: use designation　profilePath", "profilePath", profilePath)
+		slog.Debug("use designation　profilePath", "profilePath", profilePath)
 		profilePath = options.ProfilePath
 	}
 	var profileFullPath = profilePath + profile + ".yaml"
-	slog.Info("ettt: resolved profilePath finally", "profilePath", profileFullPath)
+	slog.Info("resolved profilePath finally", "profilePath", profileFullPath)
 	return profileFullPath
 }
 
@@ -269,28 +291,28 @@ JudgeScenarioResult
 func JudgeScenarioResult(sc ScenarioContext) ScenarioResultStatus {
 	for _, v := range sc.setUpPhaseResults {
 		if v.Result == CommandAssertionError {
-			slog.Info("ettt: execute scenario assertion error on Setup.")
+			slog.Info("execute scenario assertion error on Setup.")
 			return ScenarioAssertionError
 		}
 	}
 	for _, v := range sc.exercisePhaseResults {
 		if v.Result == CommandAssertionError {
-			slog.Info("ettt: execute scenario assertion error on Exercise.")
+			slog.Info("execute scenario assertion error on Exercise.")
 			return ScenarioAssertionError
 		}
 	}
 	for _, v := range sc.verifyPhaseResults {
 		if v.Result == CommandAssertionError {
-			slog.Info("ettt: execute scenario assertion error on Verify.")
+			slog.Info("execute scenario assertion error on Verify.")
 			return ScenarioAssertionError
 		}
 	}
 	for _, v := range sc.tearDownPhaseResults {
 		if v.Result == CommandAssertionError {
-			slog.Info("ettt: execute scenario assertion error on TearDown.")
+			slog.Info("execute scenario assertion error on TearDown.")
 			return ScenarioAssertionError
 		}
 	}
-	slog.Info("ettt: execute scenario successful.")
+	slog.Info("execute scenario successful.")
 	return ScenarioSuccess
 }

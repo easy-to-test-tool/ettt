@@ -31,12 +31,12 @@ type ProfileVariable struct {
 }
 
 func ParseProfile(target string) (Profile, error) {
-	slog.Info("ettt: parse profile start.", "source", target)
+	slog.Info("parse profile start.", "source", target)
 
 	// Read Yaml File
 	var bytes, err = os.ReadFile(target)
 	if err != nil {
-		slog.Error("ettt: read profile failure.", err, "source", target)
+		slog.Error("read profile failure.", err, "source", target)
 		// 空とエラーを返却
 		return Profile{}, err
 	}
@@ -45,7 +45,7 @@ func ParseProfile(target string) (Profile, error) {
 	profileVariables := Profile{}
 	err = yaml.Unmarshal(bytes, &profileVariables)
 	if err != nil {
-		slog.Error("ettt: parse profile failure.", err, "source", target)
+		slog.Error("parse profile failure.", err, "source", target)
 		// 空とエラーを返却
 		return Profile{}, err
 	}

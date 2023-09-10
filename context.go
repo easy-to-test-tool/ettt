@@ -116,6 +116,10 @@ type ScenarioContext struct {
 	executionResultDir string
 	// シナリオの結果ディレクトリ
 	scenarioResultDir string
+	// エビデンス格納ディレクトリ
+	evidencesDir string
+	// 詳細レポート格納ディレクトリ
+	detailsDir string
 	// シナリオ名
 	scenarioName string
 	// シナリオステータス
@@ -134,7 +138,6 @@ type ScenarioContext struct {
 	verifyPhaseResults []CommandResult
 	// TearDownフェーズのCommand実行結果
 	tearDownPhaseResults []CommandResult
-	//
 }
 
 /*
@@ -152,7 +155,7 @@ func (sc *ScenarioContext) RegistrationCommandResult(commandResult CommandResult
 	case ScenarioPhaseTearDown:
 		sc.tearDownPhaseResults = append(sc.tearDownPhaseResults, commandResult)
 	default:
-		fmt.Errorf("ettt: unknown scenario phase %s", sc.phase)
+		fmt.Errorf("unknown scenario phase %s", sc.phase)
 	}
 }
 

@@ -138,6 +138,8 @@ type ScenarioContext struct {
 	verifyPhaseResults []CommandResult
 	// TearDownフェーズのCommand実行結果
 	tearDownPhaseResults []CommandResult
+	// エビデンスマップ
+	evidences map[uuid.UUID]Evidence
 }
 
 /*
@@ -157,6 +159,42 @@ func (sc *ScenarioContext) RegistrationCommandResult(commandResult CommandResult
 	default:
 		fmt.Errorf("unknown scenario phase %s", sc.phase)
 	}
+}
+
+func (sc *ScenarioContext) GetEvidenceInfo(command Command) {
+
+}
+
+/*
+RegistrationTextEvidence
+テキスト形式のエビデンスを登録.
+*/
+func (sc *ScenarioContext) RegistrationTextEvidence(options RegistrationTextEvidenceOptions) error {
+	return registrationTextEvidence(sc, options)
+}
+
+/*
+RegistrationBinaryEvidence
+バイナリ形式のエビデンスを登録.
+*/
+func (sc *ScenarioContext) RegistrationBinaryEvidence(options RegistrationBinaryEvidenceOptions) error {
+	return registrationBinaryEvidence(sc, options)
+}
+
+/*
+GetEvidenceFromCommandId
+コマンドIDからエビデンスを取得.
+*/
+func (sc *ScenarioContext) GetEvidenceFromCommandId(command Command) (Evidence, error) {
+	return getEvidenceFromCommandId(sc, command)
+}
+
+/*
+GetEvidenceFromCommandId
+コマンドIDからエビデンスを取得.
+*/
+func (sc *ScenarioContext) GetEvidenceFromEvidenceId(evidenceId uuid.UUID) (Evidence, error) {
+	return getEvidenceFromEvidenceId(sc, evidenceId)
 }
 
 /*
